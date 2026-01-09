@@ -84,8 +84,8 @@ all: main-build
 main-build: LoRaTest.elf secondary-outputs
 
 # Tool invocations
-LoRaTest.elf LoRaTest.map: $(OBJS) $(USER_OBJS) C:\Users\Uporabnik\Documents\LoraTest\STM32G431RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-g++ -o "LoRaTest.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Uporabnik\Documents\LoraTest\STM32G431RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LoRaTest.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+LoRaTest.elf LoRaTest.map: $(OBJS) $(USER_OBJS) C:\Users\leonu\Documents\lora_encryption\STM32G431RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-g++ -o "LoRaTest.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\leonu\Documents\lora_encryption\STM32G431RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="LoRaTest.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

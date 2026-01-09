@@ -105,7 +105,7 @@ int main(void)
   MX_CRC_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  SX1272_Init();
+  SX1272_Init(868000000, SX1272_MOD_LORA, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
   status = SX1272_ReadReg(0x42);
   SX1272_Receive();
   int8_t msg[] = "Hello World";

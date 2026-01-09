@@ -1,4 +1,6 @@
+"./Core/Src/aes_gcm.o"
 "./Core/Src/main.o"
+"./Core/Src/nonce.o"
 "./Core/Src/stm32g4xx_hal_msp.o"
 "./Core/Src/stm32g4xx_it.o"
 "./Core/Src/sx1272.o"

@@ -1,0 +1,3 @@
+../Core/Src/nonce.c:18:6:nonce_init	4	static
+../Core/Src/nonce.c:30:10:nonce_generate	4	static
+../Core/Src/nonce.c:43:6:nonce_validate	16	static

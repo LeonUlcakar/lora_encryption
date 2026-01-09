@@ -1,0 +1,6 @@
+../Core/Src/aes_gcm.c:37:13:aes_encrypt_block	56	static
+../Core/Src/aes_gcm.c:51:13:gcm_multiply	72	static
+../Core/Src/aes_gcm.c:69:13:gcm_ghash	56	static
+../Core/Src/aes_gcm.c:83:6:aes_gcm_init	4	static
+../Core/Src/aes_gcm.c:97:6:aes_gcm_encrypt	224	dynamic
+../Core/Src/aes_gcm.c:151:6:aes_gcm_decrypt	232	dynamic

@@ -1,5 +1,5 @@
 ../Core/Src/main.c:65:6:HAL_GPIO_EXTI_Callback	16	static
-../Core/Src/main.c:80:5:main	24	static
+../Core/Src/main.c:80:5:main	32	static
 ../Core/Src/main.c:146:6:SystemClock_Config	88	static
 ../Core/Src/main.c:193:13:MX_CRC_Init	8	static
 ../Core/Src/main.c:224:13:MX_SPI1_Init	8	static

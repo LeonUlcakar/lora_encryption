@@ -4,15 +4,18 @@
 uint8_t SX1272_RxBuffer[256];
 volatile uint8_t SX1272_RxLength = 0;
 
+// Interna spremenljivka za shranjevanje trenutne modulacije (0x00=FSK ali 0x80=LoRa)
+static uint8_t _currentModulation = SX1272_MOD_LORA;
+
 static void SX1272_Select(void)   { HAL_GPIO_WritePin(SX1272_NSS_PORT, SX1272_NSS_PIN, GPIO_PIN_RESET); }
 static void SX1272_Unselect(void) { HAL_GPIO_WritePin(SX1272_NSS_PORT, SX1272_NSS_PIN, GPIO_PIN_SET); }
 
 void SX1272_Reset(void)
 {
     HAL_GPIO_WritePin(SX1272_RESET_PORT, SX1272_RESET_PIN, GPIO_PIN_RESET);
-    HAL_Delay(1); // >100 µs
+    HAL_Delay(1);
     HAL_GPIO_WritePin(SX1272_RESET_PORT, SX1272_RESET_PIN, GPIO_PIN_SET);
-    HAL_Delay(5); // >5 ms
+    HAL_Delay(5);
 }
 
 void SX1272_WriteReg(uint8_t addr, uint8_t data)
@@ -52,103 +55,127 @@ void SX1272_ReadBuffer(uint8_t addr, uint8_t *buffer, uint8_t size)
 }
 
 void SX1272_SetFrequency(uint32_t freq) {
-
     uint64_t frf = ((uint64_t)freq << 19) / 32000000;
-
-    // Write to frequency registers
     SX1272_WriteReg(REG_FRF_MSB, (frf >> 16) & 0xFF);
     SX1272_WriteReg(REG_FRF_MID, (frf >> 8)  & 0xFF);
     SX1272_WriteReg(REG_FRF_LSB, frf & 0xFF);
 }
 
-void SX1272_SetupLora(void)
+// --- Nova Setup Funkcija ---
+void SX1272_Setup(uint32_t freq, uint8_t modulation, uint8_t bw, uint8_t cr, uint8_t sf)
 {
-    // Sleep then LoRa mode
-    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_SLEEP | SX1272_MODE_LORA);
+    // Shranimo izbrano modulacijo za kasnejšo uporabo v Transmit/Receive
+    _currentModulation = modulation;
+
+    // 1. Postavi v SLEEP (nujno za preklop modulacije!)
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_SLEEP);
     HAL_Delay(10);
 
-    // Standby
-    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_STDBY | SX1272_MODE_LORA);
+    // 2. Nastavi modulacijo (Bit 7: 0=FSK, 1=LoRa) v Sleep načinu
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_SLEEP | _currentModulation);
+    HAL_Delay(10);
 
-    SX1272_SetFrequency(868000000);
+    // 3. Pojdi v STANDBY (ohrani bit modulacije)
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_STDBY | _currentModulation);
 
-    // Base addresses
-    SX1272_WriteReg(REG_FIFO_TX_BASE_ADDR, 0x00);
-    SX1272_WriteReg(REG_FIFO_RX_BASE_ADDR, 0x00);
+    // 4. Nastavi Frekvenco
+    SX1272_SetFrequency(freq);
 
-    // Modem config (BW=125kHz, CR=4/5, SF=7)
-    SX1272_WriteReg(REG_MODEM_CONFIG1, 0x72);
-    SX1272_WriteReg(REG_MODEM_CONFIG2, 0x74);
+    // 5. Konfiguracija glede na modulacijo
+    if (_currentModulation == SX1272_MOD_LORA)
+    {
+        // --- LoRa Konfiguracija ---
+        SX1272_WriteReg(REG_FIFO_TX_BASE_ADDR, 0x00);
+        SX1272_WriteReg(REG_FIFO_RX_BASE_ADDR, 0x00);
 
+        // BW | CR | Header(Explicit) | CRC Enable(1)
+        SX1272_WriteReg(REG_MODEM_CONFIG1, bw | cr | 0x02);
 
-    // Map DIO0: RxDone=00, TxDone=01 depending on mode
+        // SF | AGC Auto On(1)
+        SX1272_WriteReg(REG_MODEM_CONFIG2, sf | 0x04);
+    }
+    else
+    {
+        // --- FSK Konfiguracija (Osnovna) ---
+        // Opomba: FSK zahteva nastavitev Bitrate, Fdev, Preamble itd.
+        // Tu pustimo privzete vrednosti ali dodamo specifične registre za FSK,
+        // če jih potrebujete. Za zdaj samo preklopimo način.
+    }
+
+    // Map DIO0 default (RxDone za LoRa, za FSK je to odvisno od PacketMode)
     SX1272_WriteReg(REG_DIO_MAPPING1, 0x00);
 }
 
-void SX1272_Init(void)
+void SX1272_Init(uint32_t freq, uint8_t modulation, uint8_t bw, uint8_t cr, uint8_t sf)
 {
     SX1272_Reset();
-    SX1272_SetupLora();
+    SX1272_Setup(freq, modulation, bw, cr, sf);
 }
 
 void SX1272_Transmit(uint8_t *data, uint8_t size)
 {
-    // Map DIO0 to TxDone
+    // Mapiranje DIO0 na TxDone (01)
     SX1272_WriteReg(REG_DIO_MAPPING1, 0x40);
 
-    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_STDBY | SX1272_MODE_LORA);
-    SX1272_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
-    SX1272_WriteBuffer(REG_FIFO, data, size);
-    SX1272_WriteReg(REG_PAYLOAD_LENGTH, size);
+    // Standby
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_STDBY | _currentModulation);
 
-    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF); // Clear all IRQs
-    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_TX | SX1272_MODE_LORA);
+    if (_currentModulation == SX1272_MOD_LORA) {
+        SX1272_WriteReg(REG_FIFO_ADDR_PTR, 0x00);
+        SX1272_WriteBuffer(REG_FIFO, data, size);
+        SX1272_WriteReg(REG_PAYLOAD_LENGTH, size);
+    } else {
+        // FSK FIFO handling is slightly different (requires SyncWord setup etc.)
+        // Za preprostost tu uporabljamo isto FIFO logiko, ki deluje za Packet Mode
+        SX1272_WriteBuffer(REG_FIFO, data, size);
+        // FSK nima REG_PAYLOAD_LENGTH na istem naslovu na isti način v vseh modih,
+        // a za osnovni packet mode je podobno.
+    }
+
+    // Clear IRQ
+    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF);
+
+    // Start TX (uporabi _currentModulation, da ne povoziš LoRa bita!)
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_TX | _currentModulation);
 }
 
 void SX1272_Receive(void)
 {
-    // Map DIO0 to RxDone
-    SX1272_WriteReg(REG_DIO_MAPPING1, 0x00);
+    SX1272_WriteReg(REG_DIO_MAPPING1, 0x00); // DIO0 -> RxDone
+    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF);
 
-    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF); // Clear all IRQs
-    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_RX_CONT | SX1272_MODE_LORA);
+    // Start RX Continuous
+    SX1272_WriteReg(REG_OP_MODE, SX1272_MODE_RX_CONT | _currentModulation);
 }
 
 void SX1272_HandleDIO0(void)
 {
+    // Branje statusa
     uint8_t irqFlags = SX1272_ReadReg(REG_IRQ_FLAGS);
+    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF); // Clear
 
-    // Always clear ALL interrupts first
-    SX1272_WriteReg(REG_IRQ_FLAGS, 0xFF);  // Clear all flags
+    // Preverjanje zastavic (maske so za LoRa, FSK ima druge pomene bitov!)
+    // Če uporabljate FSK, bi morali preveriti PayloadReady bit namesto RxDone.
+    // Spodnja koda je optimizirana za LoRa.
 
-    if (irqFlags & IRQ_RX_DONE_MASK)
+    if (_currentModulation == SX1272_MOD_LORA)
     {
-        if (!(irqFlags & IRQ_CRC_ERROR_MASK))
+        if ((irqFlags & IRQ_RX_DONE_MASK) && !(irqFlags & IRQ_CRC_ERROR_MASK))
         {
-            // 1. Get payload length FIRST
             SX1272_RxLength = SX1272_ReadReg(REG_RX_NB_BYTES);
-
-            // 2. Get current FIFO address
-            uint8_t currentAddr = SX1272_ReadReg(REG_FIFO_RX_CURRENT);
-
-            // 3. Set FIFO pointer
-            SX1272_WriteReg(REG_FIFO_ADDR_PTR, currentAddr);
-
-            // 4. Read FIFO
-            if(SX1272_RxLength > 0 && SX1272_RxLength <= 256) {
-                SX1272_ReadBuffer(REG_FIFO, SX1272_RxBuffer, SX1272_RxLength);
-            }
-
-            // Optional: Null terminate if needed
-            if (SX1272_RxLength < 255) {
-                SX1272_RxBuffer[SX1272_RxLength] = '\0';
-            }
+            SX1272_WriteReg(REG_FIFO_ADDR_PTR, SX1272_ReadReg(REG_FIFO_RX_CURRENT));
+            if(SX1272_RxLength > 0) SX1272_ReadBuffer(REG_FIFO, SX1272_RxBuffer, SX1272_RxLength);
+            if(SX1272_RxLength < 255) SX1272_RxBuffer[SX1272_RxLength] = '\0';
+        }
+        else if (irqFlags & IRQ_TX_DONE_MASK)
+        {
+            SX1272_Receive();
         }
     }
-    else if (irqFlags & IRQ_TX_DONE_MASK)
+    else
     {
-        // Immediately return to RX mode after TX
-        SX1272_Receive();
+        // FSK Handling (poenostavljeno)
+        // Pri FSK DIO0 običajno pomeni PayloadReady (PacketSent / PacketReceived)
+        // Za popolno FSK podporo je potrebna dodatna logika tukaj.
     }
 }
-
