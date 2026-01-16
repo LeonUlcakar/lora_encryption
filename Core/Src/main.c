@@ -26,12 +26,30 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+SX1272_t lora_tx; // Dedicated Transmitter Module
+SX1272_t lora_rx; // Dedicated Receiver Module
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+// --- CONFIGURATION START ---
 
+// UNCOMMENT THIS LINE FOR BOARD "A"
+
+
+#define MASTER_BOARD
+
+#ifdef MASTER_BOARD
+    #define TX_FREQ 868100000 // 868.1 MHz
+    #define RX_FREQ 868500000 // 868.5 MHz
+    const char* my_msg = "Ping from Master";
+#else
+    #define TX_FREQ 868500000 // 868.5 MHz (Swapped)
+    #define RX_FREQ 868100000 // 868.1 MHz (Swapped)
+    const char* my_msg = "Pong from Slave";
+#endif
+
+// --- CONFIGURATION END ---
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,11 +82,12 @@ uint8_t irqFlags;
 /* USER CODE BEGIN 0 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    if (GPIO_Pin == SX1272_DIO0_PIN)
-    {
-        irqFlags = SX1272_ReadReg(REG_IRQ_FLAGS);
-        //printf("EXTI! IRQ=0x%02X\r\n", irqFlags);
-        SX1272_HandleDIO0();
+    // Check which module triggered the interrupt
+    if (GPIO_Pin == lora_tx.DIO0_Pin) {
+        SX1272_HandleDIO0(&lora_tx);
+    }
+    else if (GPIO_Pin == lora_rx.DIO0_Pin) {
+        SX1272_HandleDIO0(&lora_rx);
     }
 }
 /* USER CODE END 0 */
@@ -105,33 +124,64 @@ int main(void)
   MX_CRC_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  SX1272_Init(868000000, SX1272_MOD_LORA, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
-  status = SX1272_ReadReg(0x42);
-  SX1272_Receive();
-  int8_t msg[] = "Hello World";
+  // --- Initialize LORA 1 (Our Transmitter) ---
+    SX1272_Init(&lora_tx, &hspi1,
+                LORA1_NSS_GPIO_Port, LORA1_NSS_Pin,
+                LORA1_RST_GPIO_Port, LORA1_RST_Pin,
+                LORA1_DIO0_GPIO_Port, LORA1_DIO0_Pin);
 
- // Start receiving
- HAL_Delay(2000);
- uint8_t counter = 0;
- SX1272_Transmit(msg, strlen((char*)msg));
+    SX1272_ConfigAntennaSwitch(&lora_tx,
+                LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin,
+                LORA1_RX_SW_GPIO_Port, LORA1_RX_SW_Pin);
+
+    // Setup TX Frequency
+    SX1272_Setup(&lora_tx, TX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+
+    // --- Initialize LORA 2 (Our Receiver) ---
+    SX1272_Init(&lora_rx, &hspi1,
+                LORA2_NSS_GPIO_Port, LORA2_NSS_Pin,
+                LORA2_RST_GPIO_Port, LORA2_RST_Pin,
+                LORA2_DIO0_GPIO_Port, LORA2_DIO0_Pin);
+
+    SX1272_ConfigAntennaSwitch(&lora_rx,
+                LORA2_TX_SW_GPIO_Port, LORA2_TX_SW_Pin,
+                LORA2_RX_SW_GPIO_Port, LORA2_RX_SW_Pin);
+
+    // Setup RX Frequency
+    SX1272_Setup(&lora_rx, RX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+
+    // Start Listening on the RX Module
+    SX1272_Receive(&lora_rx);
+
+    uint32_t last_send_time = 0;
+    uint32_t counter = 0;
+    uint8_t ver1 = SX1272_ReadReg(&lora_tx, 0x42); // Read Version Reg
+    uint8_t ver2 = SX1272_ReadReg(&lora_rx, 0x42);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  static uint32_t lastSend = 0;
-	  if(HAL_GetTick() - lastSend >= 5000) {
-		  SX1272_Transmit(msg, strlen((char*)msg));
-		  lastSend = HAL_GetTick();
-	  }
+	  // --- TRANSMIT LOGIC (Runs on lora_tx) ---
+	        if (HAL_GetTick() - last_send_time >= 1000) // Every 1 second
+	        {
+	            sprintf((char*)txBuffer, "%s #%lu", my_msg, counter++);
+	            SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
+	            last_send_time = HAL_GetTick();
+	        }
+	        ver1 = SX1272_ReadReg(&lora_tx, 0x42); // Read Version Reg
+	        ver2 = SX1272_ReadReg(&lora_rx, 0x42);
 
-	  if (SX1272_ReadReg(REG_IRQ_FLAGS) & IRQ_RX_DONE_MASK)
-	  {
-	      //printf("POLLED RX DONE\r\n");
-	      SX1272_HandleDIO0();
-	  }
+	        // --- RECEIVE LOGIC (Runs on lora_rx) ---
+	        if (lora_rx.packetReceived)
+	        {
+	            lora_rx.packetReceived = false;
+	            // Process lora_rx.rxBuffer here if needed
 
+	            // Go back to listening
+	            SX1272_Receive(&lora_rx);
+	        }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -270,28 +320,76 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOF_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3|GPIO_PIN_4, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, LORA1_RST_Pin|LORA2_RST_Pin|LORA1_DIO1_Pin|LORA1_RX_SW_Pin
+                          |LORA2_TX_SW_Pin|LORA2_RX_SW_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PA3 PA4 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LORA2_NSS_GPIO_Port, LORA2_NSS_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LORA1_NSS_GPIO_Port, LORA1_NSS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LORA2_DIO1_GPIO_Port, LORA2_DIO1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : LORA1_RST_Pin LORA2_RST_Pin LORA1_DIO1_Pin LORA1_RX_SW_Pin
+                           LORA2_TX_SW_Pin LORA2_RX_SW_Pin */
+  GPIO_InitStruct.Pin = LORA1_RST_Pin|LORA2_RST_Pin|LORA1_DIO1_Pin|LORA1_RX_SW_Pin
+                          |LORA2_TX_SW_Pin|LORA2_RX_SW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LORA1_DIO0_Pin LORA2_DIO0_Pin */
+  GPIO_InitStruct.Pin = LORA1_DIO0_Pin|LORA2_DIO0_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LORA2_NSS_Pin */
+  GPIO_InitStruct.Pin = LORA2_NSS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LORA2_NSS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  /*Configure GPIO pin : LORA1_TX_SW_Pin */
+  GPIO_InitStruct.Pin = LORA1_TX_SW_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LORA1_TX_SW_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LORA1_NSS_Pin */
+  GPIO_InitStruct.Pin = LORA1_NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LORA1_NSS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LORA2_DIO1_Pin */
+  GPIO_InitStruct.Pin = LORA2_DIO1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LORA2_DIO1_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

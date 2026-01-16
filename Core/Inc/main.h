@@ -57,6 +57,32 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LORA1_RST_Pin GPIO_PIN_0
+#define LORA1_RST_GPIO_Port GPIOC
+#define LORA1_DIO0_Pin GPIO_PIN_1
+#define LORA1_DIO0_GPIO_Port GPIOC
+#define LORA1_DIO0_EXTI_IRQn EXTI1_IRQn
+#define LORA2_RST_Pin GPIO_PIN_2
+#define LORA2_RST_GPIO_Port GPIOC
+#define LORA2_DIO0_Pin GPIO_PIN_3
+#define LORA2_DIO0_GPIO_Port GPIOC
+#define LORA2_DIO0_EXTI_IRQn EXTI3_IRQn
+#define LORA2_NSS_Pin GPIO_PIN_4
+#define LORA2_NSS_GPIO_Port GPIOA
+#define LORA1_DIO1_Pin GPIO_PIN_5
+#define LORA1_DIO1_GPIO_Port GPIOC
+#define LORA1_TX_SW_Pin GPIO_PIN_15
+#define LORA1_TX_SW_GPIO_Port GPIOA
+#define LORA1_RX_SW_Pin GPIO_PIN_10
+#define LORA1_RX_SW_GPIO_Port GPIOC
+#define LORA2_TX_SW_Pin GPIO_PIN_11
+#define LORA2_TX_SW_GPIO_Port GPIOC
+#define LORA2_RX_SW_Pin GPIO_PIN_12
+#define LORA2_RX_SW_GPIO_Port GPIOC
+#define LORA1_NSS_Pin GPIO_PIN_2
+#define LORA1_NSS_GPIO_Port GPIOD
+#define LORA2_DIO1_Pin GPIO_PIN_9
+#define LORA2_DIO1_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
