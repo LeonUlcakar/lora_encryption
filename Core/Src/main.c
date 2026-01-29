@@ -1,4 +1,3 @@
-/* main.c */
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -56,7 +55,10 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 
 /* Private variables ---------------------------------------------------------*/
 CRC_HandleTypeDef hcrc;
+
 SPI_HandleTypeDef hspi1;
+
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 uint8_t txBuffer[256];
@@ -69,6 +71,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CRC_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -92,13 +95,32 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   */
 int main(void)
 {
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
   /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
   SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CRC_Init();
   MX_SPI1_Init();
-
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   // --- Initialize LORA 1 (Transmitter) ---
   SX1272_Init(&lora_tx, &hspi1,
@@ -137,7 +159,7 @@ int main(void)
       // --- TRANSMIT LOGIC ---
       if (HAL_GetTick() - last_send_time >= 100) // Every 1 second
       {
-          sprintf((char*)txBuffer, "%s #%lu", my_msg, counter++);
+          sprintf((char*)txBuffer, "%s #%lu \r\n\0", my_msg, counter++);
           SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
           last_send_time = HAL_GetTick();
       }
@@ -151,6 +173,7 @@ int main(void)
 
           // Re-arm RX
           SX1272_Receive(&lora_rx);
+          HAL_UART_Transmit(&huart2, lora_rx.rxBuffer, 256, HAL_MAX_DELAY);
       }
     /* USER CODE END WHILE */
 
@@ -273,6 +296,54 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
 
 }
 
