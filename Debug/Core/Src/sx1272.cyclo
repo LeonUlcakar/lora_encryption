@@ -6,8 +6,8 @@
 ../Core/Src/sx1272.c:43:6:SX1272_WriteBuffer	1
 ../Core/Src/sx1272.c:51:6:SX1272_ReadBuffer	1
 ../Core/Src/sx1272.c:60:6:SX1272_Init	1
-../Core/Src/sx1272.c:80:6:SX1272_ConfigAntennaSwitch	1
-../Core/Src/sx1272.c:85:6:SX1272_Setup	1
-../Core/Src/sx1272.c:108:6:SX1272_Transmit	1
-../Core/Src/sx1272.c:118:6:SX1272_Receive	1
-../Core/Src/sx1272.c:124:6:SX1272_HandleDIO0	5
+../Core/Src/sx1272.c:87:6:SX1272_ConfigAntennaSwitch	1
+../Core/Src/sx1272.c:92:6:SX1272_Setup	2
+../Core/Src/sx1272.c:114:6:SX1272_Transmit	2
+../Core/Src/sx1272.c:129:6:SX1272_Receive	2
+../Core/Src/sx1272.c:141:6:SX1272_HandleDIO0	6

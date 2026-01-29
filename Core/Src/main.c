@@ -1,18 +1,9 @@
+/* main.c */
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
   ******************************************************************************
   */
 /* USER CODE END Header */
@@ -22,6 +13,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "sx1272.h"
+#include <stdio.h> // Ensure sprintf is available
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,9 +26,8 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 /* USER CODE BEGIN PD */
 // --- CONFIGURATION START ---
 
-// UNCOMMENT THIS LINE FOR BOARD "A"
-
-
+// UNCOMMENT THIS LINE FOR BOARD "A" (MASTER)
+// COMMENT IT OUT FOR BOARD "B" (SLAVE)
 #define MASTER_BOARD
 
 #ifdef MASTER_BOARD
@@ -44,8 +35,8 @@ SX1272_t lora_rx; // Dedicated Receiver Module
     #define RX_FREQ 868500000 // 868.5 MHz
     const char* my_msg = "Ping from Master";
 #else
-    #define TX_FREQ 868500000 // 868.5 MHz (Swapped)
-    #define RX_FREQ 868100000 // 868.1 MHz (Swapped)
+    #define TX_FREQ 868500000 // 868.5 MHz
+    #define RX_FREQ 868100000 // 868.1 MHz
     const char* my_msg = "Pong from Slave";
 #endif
 
@@ -54,16 +45,16 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 CRC_HandleTypeDef hcrc;
-
 SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
-extern uint8_t SX1272_RxBuffer[256];
+uint8_t txBuffer[256];
+uint32_t last_send_time = 0;
+uint32_t counter = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,10 +63,6 @@ static void MX_GPIO_Init(void);
 static void MX_CRC_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-uint8_t txBuffer[256];
-uint8_t rxBuffer[256];
-uint8_t status;
-uint8_t irqFlags;
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -98,90 +85,66 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
   /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CRC_Init();
   MX_SPI1_Init();
+
   /* USER CODE BEGIN 2 */
-  // --- Initialize LORA 1 (Our Transmitter) ---
-    SX1272_Init(&lora_tx, &hspi1,
-                LORA1_NSS_GPIO_Port, LORA1_NSS_Pin,
-                LORA1_RST_GPIO_Port, LORA1_RST_Pin,
-                LORA1_DIO0_GPIO_Port, LORA1_DIO0_Pin);
+  // --- Initialize LORA 1 (Transmitter) ---
+  SX1272_Init(&lora_tx, &hspi1,
+              LORA1_NSS_GPIO_Port, LORA1_NSS_Pin,
+              LORA1_RST_GPIO_Port, LORA1_RST_Pin,
+              LORA1_DIO0_GPIO_Port, LORA1_DIO0_Pin,
+              SX1272_MOD_LORA);
 
-    SX1272_ConfigAntennaSwitch(&lora_tx,
-                LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin,
-                LORA1_RX_SW_GPIO_Port, LORA1_RX_SW_Pin);
+  SX1272_ConfigAntennaSwitch(&lora_tx,
+              LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin,
+              LORA1_RX_SW_GPIO_Port, LORA1_RX_SW_Pin);
 
-    // Setup TX Frequency
-    SX1272_Setup(&lora_tx, TX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+  SX1272_Setup(&lora_tx, TX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
 
-    // --- Initialize LORA 2 (Our Receiver) ---
-    SX1272_Init(&lora_rx, &hspi1,
-                LORA2_NSS_GPIO_Port, LORA2_NSS_Pin,
-                LORA2_RST_GPIO_Port, LORA2_RST_Pin,
-                LORA2_DIO0_GPIO_Port, LORA2_DIO0_Pin);
+  // --- Initialize LORA 2 (Receiver) ---
+  SX1272_Init(&lora_rx, &hspi1,
+              LORA2_NSS_GPIO_Port, LORA2_NSS_Pin,
+              LORA2_RST_GPIO_Port, LORA2_RST_Pin,
+              LORA2_DIO0_GPIO_Port, LORA2_DIO0_Pin,
+              SX1272_MOD_LORA);
 
-    SX1272_ConfigAntennaSwitch(&lora_rx,
-                LORA2_TX_SW_GPIO_Port, LORA2_TX_SW_Pin,
-                LORA2_RX_SW_GPIO_Port, LORA2_RX_SW_Pin);
+  SX1272_ConfigAntennaSwitch(&lora_rx,
+              LORA2_TX_SW_GPIO_Port, LORA2_TX_SW_Pin,
+              LORA2_RX_SW_GPIO_Port, LORA2_RX_SW_Pin);
 
-    // Setup RX Frequency
-    SX1272_Setup(&lora_rx, RX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+  SX1272_Setup(&lora_rx, RX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
 
-    // Start Listening on the RX Module
-    SX1272_Receive(&lora_rx);
-
-    uint32_t last_send_time = 0;
-    uint32_t counter = 0;
-    uint8_t ver1 = SX1272_ReadReg(&lora_tx, 0x42); // Read Version Reg
-    uint8_t ver2 = SX1272_ReadReg(&lora_rx, 0x42);
+  // Start Listening on the RX Module
+  SX1272_Receive(&lora_rx);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  // --- TRANSMIT LOGIC (Runs on lora_tx) ---
-	        if (HAL_GetTick() - last_send_time >= 1000) // Every 1 second
-	        {
-	            sprintf((char*)txBuffer, "%s #%lu", my_msg, counter++);
-	            SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
-	            last_send_time = HAL_GetTick();
-	        }
-	        ver1 = SX1272_ReadReg(&lora_tx, 0x42); // Read Version Reg
-	        ver2 = SX1272_ReadReg(&lora_rx, 0x42);
+      // --- TRANSMIT LOGIC ---
+      if (HAL_GetTick() - last_send_time >= 10) // Every 1 second
+      {
+          sprintf((char*)txBuffer, "%s #%lu", my_msg, counter++);
+          SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
+          last_send_time = HAL_GetTick();
+      }
 
-	        // --- RECEIVE LOGIC (Runs on lora_rx) ---
-	        if (lora_rx.packetReceived)
-	        {
-	            lora_rx.packetReceived = false;
-	            // Process lora_rx.rxBuffer here if needed
+      // --- RECEIVE LOGIC ---
+      if (lora_rx.packetReceived)
+      {
+          lora_rx.packetReceived = false;
+          // You can inspect lora_rx.rxBuffer here via debugger
+          // Or print it if you have UART set up
 
-	            // Go back to listening
-	            SX1272_Receive(&lora_rx);
-	        }
+          // Re-arm RX
+          SX1272_Receive(&lora_rx);
+      }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

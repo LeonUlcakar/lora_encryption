@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define NONCE_RANGE 20
+
 /**
  * @brief Initializes the nonce system.
  * 

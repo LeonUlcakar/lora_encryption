@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 
 // --- Register Map ---
 #define REG_FIFO                 0x00
@@ -24,13 +25,19 @@
 #define REG_MODEM_CONFIG2        0x1E
 #define REG_PAYLOAD_LENGTH       0x22
 #define REG_DIO_MAPPING1         0x40
+#define REG_VERSION              0x42
 
 // --- Constants ---
 #define SX1272_MODE_SLEEP       0x00
 #define SX1272_MODE_STDBY       0x01
 #define SX1272_MODE_TX          0x03
 #define SX1272_MODE_RX_CONT     0x05
-#define SX1272_MOD_LORA         0x80
+
+// --- Modulation Selection ---
+typedef enum {
+    SX1272_MOD_FSK  = 0x00,
+    SX1272_MOD_LORA = 0x80
+} SX1272_Modulation_t;
 
 // --- LoRa Settings ---
 #define SX1272_BW_125           0x00
@@ -50,9 +57,12 @@ typedef struct {
     GPIO_TypeDef *Reset_Port; uint16_t Reset_Pin;
     GPIO_TypeDef *DIO0_Port;  uint16_t DIO0_Pin;
 
-    // RF Switch Pins (Optional)
+    // RF Switch Pins
     GPIO_TypeDef *TX_SW_Port; uint16_t TX_SW_Pin;
     GPIO_TypeDef *RX_SW_Port; uint16_t RX_SW_Pin;
+
+    // Mode State
+    SX1272_Modulation_t modulation;
 
     // Data Buffers
     uint8_t rxBuffer[256];
@@ -65,7 +75,8 @@ typedef struct {
 void SX1272_Init(SX1272_t *mod, SPI_HandleTypeDef *hspi,
                  GPIO_TypeDef *nssP, uint16_t nssPin,
                  GPIO_TypeDef *rstP, uint16_t rstPin,
-                 GPIO_TypeDef *dioP, uint16_t dioPin);
+                 GPIO_TypeDef *dioP, uint16_t dioPin,
+                 SX1272_Modulation_t modulation);
 
 void SX1272_ConfigAntennaSwitch(SX1272_t *mod,
                                 GPIO_TypeDef *txP, uint16_t txPin,
@@ -74,9 +85,8 @@ void SX1272_ConfigAntennaSwitch(SX1272_t *mod,
 void SX1272_Setup(SX1272_t *mod, uint32_t freq, uint8_t bw, uint8_t cr, uint8_t sf);
 void SX1272_Transmit(SX1272_t *mod, uint8_t *data, uint8_t size);
 void SX1272_Receive(SX1272_t *mod);
-void SX1272_HandleDIO0(SX1272_t *mod); // Call in HAL_GPIO_EXTI_Callback
+void SX1272_HandleDIO0(SX1272_t *mod);
 
-// Low level access if needed
 void SX1272_WriteReg(SX1272_t *mod, uint8_t addr, uint8_t data);
 uint8_t SX1272_ReadReg(SX1272_t *mod, uint8_t addr);
 
