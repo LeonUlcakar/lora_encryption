@@ -8,6 +8,6 @@
 ../Core/Src/sx1272.c:60:6:SX1272_Init	24	static
 ../Core/Src/sx1272.c:87:6:SX1272_ConfigAntennaSwitch	24	static
 ../Core/Src/sx1272.c:92:6:SX1272_Setup	48	static
-../Core/Src/sx1272.c:114:6:SX1272_Transmit	24	static
-../Core/Src/sx1272.c:129:6:SX1272_Receive	16	static
-../Core/Src/sx1272.c:141:6:SX1272_HandleDIO0	24	static
+../Core/Src/sx1272.c:153:6:SX1272_Transmit	24	static
+../Core/Src/sx1272.c:181:6:SX1272_Receive	16	static
+../Core/Src/sx1272.c:199:6:SX1272_HandleDIO0	24	static

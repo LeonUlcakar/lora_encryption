@@ -25,20 +25,27 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 // --- CONFIGURATION START ---
-
+#define CHANNEL_1_FREQ  868100000 // 868.1 MHz
+#define CHANNEL_2_FREQ  868600000 // 868.6 MHz
 // UNCOMMENT THIS LINE FOR BOARD "A" (MASTER)
 // COMMENT IT OUT FOR BOARD "B" (SLAVE)
-#define MASTER_BOARD
+//#define MASTER_BOARD
 
 #ifdef MASTER_BOARD
-    #define TX_FREQ 868100000 // 868.1 MHz
-    #define RX_FREQ 868500000 // 868.5 MHz
+    // Master Sends on Ch1, Listens on Ch2
+    #define TX_FREQ      CHANNEL_1_FREQ
+    #define RX_FREQ      CHANNEL_2_FREQ
     const char* my_msg = "Ping from Master";
 #else
-    #define TX_FREQ 868500000 // 868.5 MHz
-    #define RX_FREQ 868100000 // 868.1 MHz
+    // Slave Listens on Ch1, Sends on Ch2 (Crossover)
+    #define TX_FREQ      CHANNEL_2_FREQ
+    #define RX_FREQ      CHANNEL_1_FREQ
     const char* my_msg = "Pong from Slave";
 #endif
+
+// Select Mode Here (Applies to both)
+//#define SELECTED_MODULATION SX1272_MOD_FSK
+#define SELECTED_MODULATION SX1272_MOD_LORA
 
 // --- CONFIGURATION END ---
 /* USER CODE END PD */
@@ -98,7 +105,7 @@ int main(void)
               LORA1_NSS_GPIO_Port, LORA1_NSS_Pin,
               LORA1_RST_GPIO_Port, LORA1_RST_Pin,
               LORA1_DIO0_GPIO_Port, LORA1_DIO0_Pin,
-              SX1272_MOD_LORA);
+			  SELECTED_MODULATION);
 
   SX1272_ConfigAntennaSwitch(&lora_tx,
               LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin,
@@ -111,7 +118,7 @@ int main(void)
               LORA2_NSS_GPIO_Port, LORA2_NSS_Pin,
               LORA2_RST_GPIO_Port, LORA2_RST_Pin,
               LORA2_DIO0_GPIO_Port, LORA2_DIO0_Pin,
-              SX1272_MOD_LORA);
+			  SELECTED_MODULATION);
 
   SX1272_ConfigAntennaSwitch(&lora_rx,
               LORA2_TX_SW_GPIO_Port, LORA2_TX_SW_Pin,
@@ -128,7 +135,7 @@ int main(void)
   while (1)
   {
       // --- TRANSMIT LOGIC ---
-      if (HAL_GetTick() - last_send_time >= 10) // Every 1 second
+      if (HAL_GetTick() - last_send_time >= 100) // Every 1 second
       {
           sprintf((char*)txBuffer, "%s #%lu", my_msg, counter++);
           SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
