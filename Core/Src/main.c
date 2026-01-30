@@ -24,11 +24,11 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 // --- CONFIGURATION START ---
-#define CHANNEL_1_FREQ  868100000 // 868.1 MHz
-#define CHANNEL_2_FREQ  868600000 // 868.6 MHz
+#define CHANNEL_1_FREQ  868000000 // 867.8 MHz
+#define CHANNEL_2_FREQ  869000000 // 869.0 MHz
 // UNCOMMENT THIS LINE FOR BOARD "A" (MASTER)
 // COMMENT IT OUT FOR BOARD "B" (SLAVE)
-//#define MASTER_BOARD
+#define MASTER_BOARD
 
 #ifdef MASTER_BOARD
     // Master Sends on Ch1, Listens on Ch2
@@ -133,7 +133,7 @@ int main(void)
               LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin,
               LORA1_RX_SW_GPIO_Port, LORA1_RX_SW_Pin);
 
-  SX1272_Setup(&lora_tx, TX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+  SX1272_Setup(&lora_tx, TX_FREQ, SX1272_BW_500, SX1272_CR_4_5, SX1272_SF_7);
 
   // --- Initialize LORA 2 (Receiver) ---
   SX1272_Init(&lora_rx, &hspi1,
@@ -146,7 +146,7 @@ int main(void)
               LORA2_TX_SW_GPIO_Port, LORA2_TX_SW_Pin,
               LORA2_RX_SW_GPIO_Port, LORA2_RX_SW_Pin);
 
-  SX1272_Setup(&lora_rx, RX_FREQ, SX1272_BW_125, SX1272_CR_4_5, SX1272_SF_7);
+  SX1272_Setup(&lora_rx, RX_FREQ, SX1272_BW_500, SX1272_CR_4_5, SX1272_SF_7);
 
   // Start Listening on the RX Module
   SX1272_Receive(&lora_rx);
@@ -157,7 +157,7 @@ int main(void)
   while (1)
   {
       // --- TRANSMIT LOGIC ---
-      if (HAL_GetTick() - last_send_time >= 100) // Every 1 second
+      if (HAL_GetTick() - last_send_time >= 10) // Every 1 second
       {
           sprintf((char*)txBuffer, "%s #%lu \r\n\0", my_msg, counter++);
           SX1272_Transmit(&lora_tx, txBuffer, strlen((char*)txBuffer));
@@ -167,7 +167,7 @@ int main(void)
       // --- RECEIVE LOGIC ---
       if (lora_rx.packetReceived)
       {
-          lora_rx.packetReceived = false;
+		   lora_rx.packetReceived = false;
           // You can inspect lora_rx.rxBuffer here via debugger
           // Or print it if you have UART set up
 
@@ -315,7 +315,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 9600;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;

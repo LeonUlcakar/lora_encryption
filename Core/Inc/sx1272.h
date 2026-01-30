@@ -11,10 +11,10 @@
 // --- Register Map ---
 #define REG_FIFO                 0x00
 #define REG_OP_MODE              0x01
-#define REG_BITRATE_MSB          0x02 // FSK
-#define REG_BITRATE_LSB          0x03 // FSK
-#define REG_FDEV_MSB             0x04 // FSK
-#define REG_FDEV_LSB             0x05 // FSK
+#define REG_BITRATE_MSB          0x02
+#define REG_BITRATE_LSB          0x03
+#define REG_FDEV_MSB             0x04
+#define REG_FDEV_LSB             0x05
 #define REG_FRF_MSB              0x06
 #define REG_FRF_MID              0x07
 #define REG_FRF_LSB              0x08
@@ -22,31 +22,16 @@
 #define REG_PA_RAMP              0x0A
 #define REG_OCP                  0x0B
 #define REG_LNA                  0x0C
-#define REG_RX_CONFIG            0x0D // FSK: RestartRx, AfcAutoOn
-#define REG_FIFO_ADDR_PTR        0x0D // LoRa: FifoAddrPtr (Same address as RxConfig)
-#define REG_FIFO_TX_BASE_ADDR    0x0E // LoRa
-#define REG_FIFO_RX_BASE_ADDR    0x0F // LoRa
-#define REG_FIFO_RX_CURRENT      0x10 // LoRa
-#define REG_IRQ_FLAGS            0x12 // LoRa
-#define REG_RX_NB_BYTES          0x13 // LoRa
-#define REG_RX_BW                0x1F // FSK
-#define REG_AFC_FEI              0x1A // FSK
-#define REG_MODEM_CONFIG1        0x1D // LoRa
-#define REG_MODEM_CONFIG2        0x1E // LoRa
-#define REG_PAYLOAD_LENGTH       0x22 // LoRa <--- CRITICAL: DO NOT REMOVE
-#define REG_PREAMBLE_MSB_FSK     0x25 // FSK
-#define REG_PREAMBLE_LSB_FSK     0x26 // FSK
-#define REG_SYNC_CONFIG          0x27 // FSK
-#define REG_SYNC_VALUE1          0x28 // FSK
-#define REG_PACKET_CONFIG1       0x30 // FSK
-#define REG_PACKET_CONFIG2       0x31 // FSK
-#define REG_PAYLOAD_LENGTH_FSK   0x32 // FSK
-#define REG_FIFO_THRESH          0x35 // FSK
-#define REG_SEQ_CONFIG1          0x36 // FSK
-#define REG_IRQ_FLAGS1           0x3E // FSK
-#define REG_IRQ_FLAGS2           0x3F // FSK
+#define REG_FIFO_ADDR_PTR        0x0D
+#define REG_FIFO_TX_BASE_ADDR    0x0E
+#define REG_FIFO_RX_BASE_ADDR    0x0F
+#define REG_FIFO_RX_CURRENT      0x10
+#define REG_IRQ_FLAGS            0x12
+#define REG_RX_NB_BYTES          0x13
+#define REG_MODEM_CONFIG1        0x1D
+#define REG_MODEM_CONFIG2        0x1E
+#define REG_PAYLOAD_LENGTH       0x22
 #define REG_DIO_MAPPING1         0x40
-#define REG_DIO_MAPPING2         0x41
 #define REG_VERSION              0x42
 
 // --- Constants ---
@@ -65,8 +50,11 @@ typedef enum {
 #define SX1272_BW_125           0x00
 #define SX1272_BW_250           0x40
 #define SX1272_BW_500           0x80
+
 #define SX1272_CR_4_5           0x08
+
 #define SX1272_SF_7             0x70
+#define SX1272_SF_12            0xC0
 
 // --- Instance Structure ---
 typedef struct {
@@ -82,7 +70,7 @@ typedef struct {
     volatile bool packetReceived;
 } SX1272_t;
 
-// --- Function Prototypes ---
+// --- Functions ---
 void SX1272_Init(SX1272_t *mod, SPI_HandleTypeDef *hspi,
                  GPIO_TypeDef *nssP, uint16_t nssPin,
                  GPIO_TypeDef *rstP, uint16_t rstPin,
