@@ -28,7 +28,7 @@ SX1272_t lora_rx; // Dedicated Receiver Module
 #define CHANNEL_2_FREQ  869000000 // 869.0 MHz
 // UNCOMMENT THIS LINE FOR BOARD "A" (MASTER)
 // COMMENT IT OUT FOR BOARD "B" (SLAVE)
-#define MASTER_BOARD
+//#define MASTER_BOARD
 
 #ifdef MASTER_BOARD
     // Master Sends on Ch1, Listens on Ch2
@@ -150,6 +150,8 @@ int main(void)
 
   // Start Listening on the RX Module
   SX1272_Receive(&lora_rx);
+  uint8_t lora1_id = SX1272_ReadReg(&lora_tx, REG_VERSION);
+  uint8_t lora2_id = SX1272_ReadReg(&lora_rx, REG_VERSION);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -316,7 +318,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 115200;
+  huart3.Init.BaudRate = 9600;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
