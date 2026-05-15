@@ -1,6 +1,7 @@
-../Core/Src/test.c:38:6:Test_Init	24	static
-../Core/Src/test.c:47:6:Test_SetCustomPayload	24	static
-../Core/Src/test.c:62:6:Test_Start	8	static
-../Core/Src/test.c:79:13:PrintResults	312	static
-../Core/Src/test.c:107:6:Test_Process	16	static
-../Core/Src/test.c:132:6:Test_HandleReceive	32	static
+../Core/Src/test.c:51:13:ResetCounters	4	static
+../Core/Src/test.c:64:6:Test_Init	24	static
+../Core/Src/test.c:74:6:Test_SetCustomPayload	16	static
+../Core/Src/test.c:89:6:Test_Start	56	static
+../Core/Src/test.c:102:13:PrintResults	312	static
+../Core/Src/test.c:134:6:Test_Process	64	static
+../Core/Src/test.c:198:6:Test_HandleReceive	32	static
