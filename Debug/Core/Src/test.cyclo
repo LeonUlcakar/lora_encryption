@@ -1,7 +1,8 @@
-../Core/Src/test.c:51:13:ResetCounters	1
-../Core/Src/test.c:64:6:Test_Init	1
-../Core/Src/test.c:74:6:Test_SetCustomPayload	4
-../Core/Src/test.c:89:6:Test_Start	2
-../Core/Src/test.c:102:13:PrintResults	5
-../Core/Src/test.c:134:6:Test_Process	14
-../Core/Src/test.c:198:6:Test_HandleReceive	15
+../Core/Src/test.c:56:13:TransmitPacket	2
+../Core/Src/test.c:68:13:ResetCounters	1
+../Core/Src/test.c:81:6:Test_Init	1
+../Core/Src/test.c:101:6:Test_SetCustomPayload	4
+../Core/Src/test.c:116:6:Test_Start	2
+../Core/Src/test.c:129:13:PrintResults	5
+../Core/Src/test.c:169:6:Test_Process	14
+../Core/Src/test.c:232:6:Test_HandleReceive	16

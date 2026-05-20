@@ -1,0 +1,4 @@
+../Core/Src/crypto_wrapper.c:8:9:secure_payload_encrypt	88	static
+../Core/Src/crypto_wrapper.c:39:9:secure_payload_decrypt	80	static
+../Core/Src/crypto_wrapper.c:69:20:cmox_ll_init	16	static
+../Core/Src/crypto_wrapper.c:83:20:cmox_ll_deInit	16	static

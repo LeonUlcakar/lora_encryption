@@ -2,6 +2,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#if TEST_USE_ENCRYPTION
+#include "crypto_wrapper.h"
+#include "cmox_crypto.h"
+#endif
+
 #define SYNC_MAGIC_NUM 0xFFFFFFFF
 
 typedef enum {
@@ -48,6 +53,18 @@ static uint32_t max_jitter_us = 0;
 static TestPayload_t tx_pkt = {0};
 static uint8_t current_tx_size = 255;
 
+static void TransmitPacket(uint8_t *data, uint8_t size) {
+#if TEST_USE_ENCRYPTION
+    uint8_t encrypted_buf[255];
+    size_t enc_len = 0;
+    if (secure_payload_encrypt(data, size, encrypted_buf, &enc_len)) {
+        SX1272_Transmit(lora_tx, encrypted_buf, (uint8_t)enc_len);
+    }
+#else
+    SX1272_Transmit(lora_tx, data, size);
+#endif
+}
+
 static void ResetCounters(void) {
     seq_counter = 0;
     expected_seq = 0;
@@ -67,6 +84,16 @@ void Test_Init(UART_HandleTypeDef *huart, TIM_HandleTypeDef *htim, SX1272_t *tx_
     lora_tx = tx_mod;
     lora_rx = rx_mod;
     current_role = role;
+
+#if TEST_USE_ENCRYPTION
+    cmox_initialize(NULL);
+
+    uint8_t tx_cfg = SX1272_ReadReg(lora_tx, REG_MODEM_CONFIG1);
+    SX1272_WriteReg(lora_tx, REG_MODEM_CONFIG1, tx_cfg & ~0x02); // Clear RxPayloadCrcOn bit dynamically
+
+    uint8_t rx_cfg = SX1272_ReadReg(lora_rx, REG_MODEM_CONFIG1);
+    SX1272_WriteReg(lora_rx, REG_MODEM_CONFIG1, rx_cfg & ~0x02); // Clear RxPayloadCrcOn bit dynamically
+#endif
 
     Test_SetCustomPayload(NULL, 0);
 }
@@ -107,7 +134,12 @@ static void PrintResults(void) {
         uint32_t avg_jitter = pkts_received > 1 ? (total_jitter_us / (pkts_received - 1)) : 0;
         uint32_t loss_pct = pkts_sent > 0 ? ((pkts_sent - pkts_received) * 100 / pkts_sent) : 0;
 
-        sprintf(msg, "\r\n--- MASTER TEST RESULTS (60s) ---\r\n"
+#if TEST_USE_ENCRYPTION
+        sprintf(msg, "\r\n--- MASTER TEST RESULTS (ENCRYPTED) ---\r\n");
+#else
+        sprintf(msg, "\r\n--- MASTER TEST RESULTS (PLAINTEXT) ---\r\n");
+#endif
+        sprintf(msg + strlen(msg),
                      "Packets Sent: %lu\r\n"
                      "Packets Rcvd: %lu\r\n"
                      "Packet Loss:  %lu%%\r\n"
@@ -118,7 +150,12 @@ static void PrintResults(void) {
     } else {
         uint32_t rate = pkts_received / (TEST_DURATION_MS / 1000);
 
-        sprintf(msg, "\r\n--- SLAVE TEST RESULTS (60s) ---\r\n"
+#if TEST_USE_ENCRYPTION
+        sprintf(msg, "\r\n--- SLAVE TEST RESULTS (ENCRYPTED) ---\r\n");
+#else
+        sprintf(msg, "\r\n--- SLAVE TEST RESULTS (PLAINTEXT) ---\r\n");
+#endif
+        sprintf(msg + strlen(msg),
                      "Packets Rcvd: %lu\r\n"
                      "Packets Lost: %lu\r\n"
                      "Avg Rx Rate:  %lu pkt/s\r\n"
@@ -127,8 +164,6 @@ static void PrintResults(void) {
     }
 
     HAL_UART_Transmit(uart_handle, (uint8_t*)msg, strlen(msg), 1000);
-
-
 }
 
 void Test_Process(void) {
@@ -141,11 +176,10 @@ void Test_Process(void) {
 
         case STATE_SYNCING:
             if (current_role == TEST_ROLE_MASTER) {
-                // Keep sending sync packets until we get an echo
                 if (current_time - last_tx_time >= TEST_TX_INTERVAL_MS) {
                     tx_pkt.seq_num = SYNC_MAGIC_NUM;
                     tx_pkt.tx_time_us = 0;
-                    SX1272_Transmit(lora_tx, (uint8_t*)&tx_pkt, current_tx_size);
+                    TransmitPacket((uint8_t*)&tx_pkt, current_tx_size);
                     last_tx_time = current_time;
                 }
             }
@@ -185,7 +219,7 @@ void Test_Process(void) {
                     tx_pkt.seq_num = seq_counter++;
                     tx_pkt.tx_time_us = __HAL_TIM_GET_COUNTER(timer_handle);
 
-                    SX1272_Transmit(lora_tx, (uint8_t*)&tx_pkt, current_tx_size);
+                    TransmitPacket((uint8_t*)&tx_pkt, current_tx_size);
 
                     pkts_sent++;
                     last_tx_time = current_time;
@@ -196,15 +230,30 @@ void Test_Process(void) {
 }
 
 void Test_HandleReceive(void) {
-    TestPayload_t *rx_pkt = (TestPayload_t*)lora_rx->rxBuffer;
+    TestPayload_t *rx_pkt;
+    uint8_t actual_length;
 
-    // Catch sync packets immediately regardless of state
+#if TEST_USE_ENCRYPTION
+    uint8_t decrypted_buf[255];
+    size_t dec_len = 0;
+
+    if (!secure_payload_decrypt(lora_rx->rxBuffer, lora_rx->rxLength, decrypted_buf, &dec_len)) {
+        return; // Silently drop packets failing authentication
+    }
+
+    rx_pkt = (TestPayload_t*)decrypted_buf;
+    actual_length = (uint8_t)dec_len;
+#else
+    rx_pkt = (TestPayload_t*)lora_rx->rxBuffer;
+    actual_length = lora_rx->rxLength;
+#endif
+
     if (rx_pkt->seq_num == SYNC_MAGIC_NUM) {
         if (current_role == TEST_ROLE_MASTER && current_state == STATE_SYNCING) {
             current_state = STATE_SYNC_WAIT;
             state_timer = HAL_GetTick();
         } else if (current_role == TEST_ROLE_SLAVE) {
-            SX1272_Transmit(lora_tx, (uint8_t*)rx_pkt, lora_rx->rxLength);
+            TransmitPacket((uint8_t*)rx_pkt, actual_length);
             current_state = STATE_SYNC_WAIT;
             state_timer = HAL_GetTick();
         }
@@ -247,6 +296,6 @@ void Test_HandleReceive(void) {
         expected_seq = rx_pkt->seq_num + 1;
         pkts_received++;
 
-        SX1272_Transmit(lora_tx, (uint8_t*)rx_pkt, lora_rx->rxLength);
+        TransmitPacket((uint8_t*)rx_pkt, actual_length);
     }
 }
