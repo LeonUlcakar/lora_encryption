@@ -36,8 +36,6 @@ static uint32_t test_start_time = 0;
 static uint32_t last_tx_time = 0;
 static uint32_t last_rx_check = 0;
 
-static uint8_t is_tx_active = 0;
-
 static uint32_t seq_counter = 0;
 static uint32_t expected_seq = 0;
 
@@ -91,7 +89,6 @@ void Test_Init(UART_HandleTypeDef *huart, TIM_HandleTypeDef *htim, SX1272_t *tx_
     current_role = role;
 
 #if TEST_USE_ENCRYPTION
-    //cmox_initialize(NULL);
     // Hardware CRC left enabled to drop corrupt packets before decryption
 #endif
 
@@ -118,7 +115,6 @@ void Test_SetCustomPayload(uint8_t *data, uint8_t size) {
 void Test_Start(void) {
     current_state = STATE_SYNCING;
     last_tx_time = 0;
-    is_tx_active = 0;
 
     if (current_role == TEST_ROLE_MASTER) {
         char msg[] = "Initiating SYNC with remote device...\r\n";
@@ -196,8 +192,6 @@ void Test_Process(void) {
                 last_tx_time = 0;
                 last_rx_check = current_time;
 
-                is_tx_active = 0;
-
                 ResetCounters();
 
                 if (current_role == TEST_ROLE_MASTER) {
@@ -221,21 +215,13 @@ void Test_Process(void) {
             }
 
             if (current_role == TEST_ROLE_MASTER) {
-                if (is_tx_active) {
-                    uint8_t expected_mode = SX1272_MODE_STDBY | (uint8_t)lora_tx->modulation;
-                    // Poll radio state to detect when DIO0 drops it to STDBY
-                    if (SX1272_ReadReg(lora_tx, REG_OP_MODE) == expected_mode) {
-                        is_tx_active = 0;
-                    }
-                }
-
-                if (!is_tx_active) {
+                if (current_time - last_tx_time >= TEST_TX_INTERVAL_MS) {
                     tx_pkt.seq_num = seq_counter++;
                     tx_pkt.tx_time_us = __HAL_TIM_GET_COUNTER(timer_handle);
 
                     if (TransmitPacket((uint8_t*)&tx_pkt, current_tx_size)) {
                         pkts_sent++;
-                        is_tx_active = 1;
+                        last_tx_time = current_time;
                     }
                 }
             }

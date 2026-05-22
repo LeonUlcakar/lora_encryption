@@ -422,7 +422,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LORA1_TX_SW_GPIO_Port, LORA1_TX_SW_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LORA1_NSS_GPIO_Port, LORA1_NSS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LORA1_NSS_GPIO_Port, LORA1_NSS_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pins : LORA1_RST_Pin LORA2_RST_Pin LORA1_DIO1_Pin LORA1_RX_SW_Pin
                            LORA2_TX_SW_Pin LORA2_RX_SW_Pin */
