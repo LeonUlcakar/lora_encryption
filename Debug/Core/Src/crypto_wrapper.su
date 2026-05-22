@@ -1,4 +1,13 @@
-../Core/Src/crypto_wrapper.c:9:9:secure_payload_encrypt	600	static
-../Core/Src/crypto_wrapper.c:43:9:secure_payload_decrypt	600	static
-../Core/Src/crypto_wrapper.c:74:20:cmox_ll_init	24	static
-../Core/Src/crypto_wrapper.c:79:20:cmox_ll_deInit	16	static
+../Core/Src/crypto_wrapper.c:33:13:aes_key_expansion	32	static
+../Core/Src/crypto_wrapper.c:52:13:add_round_key	24	static
+../Core/Src/crypto_wrapper.c:58:13:sub_bytes	24	static
+../Core/Src/crypto_wrapper.c:64:13:shift_rows	24	static
+../Core/Src/crypto_wrapper.c:72:16:xtime	16	static
+../Core/Src/crypto_wrapper.c:76:13:mix_columns	24	static
+../Core/Src/crypto_wrapper.c:88:13:aes_encrypt_block	48	static
+../Core/Src/crypto_wrapper.c:113:13:gf_mult	80	static
+../Core/Src/crypto_wrapper.c:137:13:inc32	24	static
+../Core/Src/crypto_wrapper.c:144:13:ghash	56	static
+../Core/Src/crypto_wrapper.c:171:13:ensure_init	8	static
+../Core/Src/crypto_wrapper.c:178:6:secure_payload_encrypt	248	static
+../Core/Src/crypto_wrapper.c:251:6:secure_payload_decrypt	272	static

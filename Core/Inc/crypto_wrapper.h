@@ -3,8 +3,20 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
-uint8_t secure_payload_encrypt(uint8_t *plaintext, size_t pt_len, uint8_t *out_buffer, size_t *out_len);
-uint8_t secure_payload_decrypt(uint8_t *in_buffer, size_t in_len, uint8_t *plaintext, size_t *pt_len);
+/* Encrypts plaintext into output buffer.
+ * Output format: [12-byte IV] + [Ciphertext] + [16-byte MAC Tag]
+ * out_len will be in_len + 28.
+ * out buffer must be large enough! (e.g., 255 bytes for LoRa)
+ */
+bool secure_payload_encrypt(const uint8_t *in, size_t in_len, uint8_t *out, size_t *out_len);
 
-#endif
+/* Decrypts payload and verifies authentication tag.
+ * Input format: [12-byte IV] + [Ciphertext] + [16-byte MAC Tag]
+ * out_len will be in_len - 28.
+ * Returns true if authentication succeeds and decryption is valid.
+ */
+bool secure_payload_decrypt(const uint8_t *in, size_t in_len, uint8_t *out, size_t *out_len);
+
+#endif /* CRYPTO_WRAPPER_H */

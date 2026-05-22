@@ -5,5 +5,5 @@
 
 USER_OBJS :=
 
-LIBS := -lSTM32Cryptographic_CM4
+LIBS :=
 

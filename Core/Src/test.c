@@ -4,7 +4,6 @@
 
 #if TEST_USE_ENCRYPTION
 #include "crypto_wrapper.h"
-#include "cmox_crypto.h"
 #endif
 
 #define SYNC_MAGIC_NUM 0xFFFFFFFF
@@ -92,7 +91,7 @@ void Test_Init(UART_HandleTypeDef *huart, TIM_HandleTypeDef *htim, SX1272_t *tx_
     current_role = role;
 
 #if TEST_USE_ENCRYPTION
-    cmox_initialize(NULL);
+    //cmox_initialize(NULL);
     // Hardware CRC left enabled to drop corrupt packets before decryption
 #endif
 
