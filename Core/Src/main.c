@@ -24,7 +24,7 @@ SX1272_t lora_rx;
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define CHANNEL_1_FREQ  867000000
+#define CHANNEL_1_FREQ  863000000
 #define CHANNEL_2_FREQ  869000000
 
 // Uncomment for Master board, comment for Slave board

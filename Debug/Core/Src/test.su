@@ -1,8 +1,8 @@
-../Core/Src/test.c:56:13:TransmitPacket	280	static
-../Core/Src/test.c:68:13:ResetCounters	4	static
-../Core/Src/test.c:81:6:Test_Init	32	static
-../Core/Src/test.c:101:6:Test_SetCustomPayload	24	static
-../Core/Src/test.c:116:6:Test_Start	56	static
-../Core/Src/test.c:129:13:PrintResults	312	static
-../Core/Src/test.c:169:6:Test_Process	64	static
-../Core/Src/test.c:232:6:Test_HandleReceive	296	static
+../Core/Src/test.c:58:16:TransmitPacket	280	static
+../Core/Src/test.c:74:13:ResetCounters	4	static
+../Core/Src/test.c:87:6:Test_Init	24	static
+../Core/Src/test.c:102:6:Test_SetCustomPayload	24	static
+../Core/Src/test.c:119:6:Test_Start	56	static
+../Core/Src/test.c:133:13:PrintResults	312	static
+../Core/Src/test.c:174:6:Test_Process	80	static
+../Core/Src/test.c:247:6:Test_HandleReceive	296	static

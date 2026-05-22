@@ -37,6 +37,8 @@ static uint32_t test_start_time = 0;
 static uint32_t last_tx_time = 0;
 static uint32_t last_rx_check = 0;
 
+static uint8_t is_tx_active = 0;
+
 static uint32_t seq_counter = 0;
 static uint32_t expected_seq = 0;
 
@@ -53,15 +55,19 @@ static uint32_t max_jitter_us = 0;
 static TestPayload_t tx_pkt = {0};
 static uint8_t current_tx_size = 255;
 
-static void TransmitPacket(uint8_t *data, uint8_t size) {
+static uint8_t TransmitPacket(uint8_t *data, uint8_t size) {
 #if TEST_USE_ENCRYPTION
     uint8_t encrypted_buf[255];
     size_t enc_len = 0;
     if (secure_payload_encrypt(data, size, encrypted_buf, &enc_len)) {
         SX1272_Transmit(lora_tx, encrypted_buf, (uint8_t)enc_len);
+        return 1;
     }
+    // Abort if encryption fails or payload exceeds LoRa FIFO bounds
+    return 0;
 #else
     SX1272_Transmit(lora_tx, data, size);
+    return 1;
 #endif
 }
 
@@ -87,12 +93,7 @@ void Test_Init(UART_HandleTypeDef *huart, TIM_HandleTypeDef *htim, SX1272_t *tx_
 
 #if TEST_USE_ENCRYPTION
     cmox_initialize(NULL);
-
-    uint8_t tx_cfg = SX1272_ReadReg(lora_tx, REG_MODEM_CONFIG1);
-    SX1272_WriteReg(lora_tx, REG_MODEM_CONFIG1, tx_cfg & ~0x02); // Clear RxPayloadCrcOn bit dynamically
-
-    uint8_t rx_cfg = SX1272_ReadReg(lora_rx, REG_MODEM_CONFIG1);
-    SX1272_WriteReg(lora_rx, REG_MODEM_CONFIG1, rx_cfg & ~0x02); // Clear RxPayloadCrcOn bit dynamically
+    // Hardware CRC left enabled to drop corrupt packets before decryption
 #endif
 
     Test_SetCustomPayload(NULL, 0);
@@ -106,16 +107,19 @@ void Test_SetCustomPayload(uint8_t *data, uint8_t size) {
             size = MAX_CUSTOM_PAYLOAD_SIZE;
         }
         memcpy(tx_pkt.payload_data, data, size);
+        // Include overhead: seq_num (4 bytes) + tx_time_us (4 bytes)
         current_tx_size = size + 8;
     } else {
         memcpy(tx_pkt.payload_data, default_payload_data, sizeof(default_payload_data));
-        current_tx_size = sizeof(TestPayload_t);
+        // Calculate actual size to prevent triggering the 227-byte encryption limit
+        current_tx_size = 8 + sizeof(default_payload_data);
     }
 }
 
 void Test_Start(void) {
     current_state = STATE_SYNCING;
     last_tx_time = 0;
+    is_tx_active = 0;
 
     if (current_role == TEST_ROLE_MASTER) {
         char msg[] = "Initiating SYNC with remote device...\r\n";
@@ -157,10 +161,11 @@ static void PrintResults(void) {
 #endif
         sprintf(msg + strlen(msg),
                      "Packets Rcvd: %lu\r\n"
+                     "Packets Echoed: %lu\r\n"
                      "Packets Lost: %lu\r\n"
                      "Avg Rx Rate:  %lu pkt/s\r\n"
                      "--------------------------------\r\n",
-                pkts_received, pkts_lost, rate);
+                pkts_received, pkts_sent, pkts_lost, rate);
     }
 
     HAL_UART_Transmit(uart_handle, (uint8_t*)msg, strlen(msg), 1000);
@@ -192,10 +197,12 @@ void Test_Process(void) {
                 last_tx_time = 0;
                 last_rx_check = current_time;
 
+                is_tx_active = 0;
+
                 ResetCounters();
 
                 if (current_role == TEST_ROLE_MASTER) {
-                    char msg[] = "Sync complete. Starting 60s test...\r\n";
+                    char msg[] = "Sync complete. Starting 60s max-throughput test...\r\n";
                     HAL_UART_Transmit(uart_handle, (uint8_t*)msg, strlen(msg), 100);
                 }
             }
@@ -215,14 +222,22 @@ void Test_Process(void) {
             }
 
             if (current_role == TEST_ROLE_MASTER) {
-                if (current_time - last_tx_time >= TEST_TX_INTERVAL_MS) {
+                if (is_tx_active) {
+                    uint8_t expected_mode = SX1272_MODE_STDBY | (uint8_t)lora_tx->modulation;
+                    // Poll radio state to detect when DIO0 drops it to STDBY
+                    if (SX1272_ReadReg(lora_tx, REG_OP_MODE) == expected_mode) {
+                        is_tx_active = 0;
+                    }
+                }
+
+                if (!is_tx_active) {
                     tx_pkt.seq_num = seq_counter++;
                     tx_pkt.tx_time_us = __HAL_TIM_GET_COUNTER(timer_handle);
 
-                    TransmitPacket((uint8_t*)&tx_pkt, current_tx_size);
-
-                    pkts_sent++;
-                    last_tx_time = current_time;
+                    if (TransmitPacket((uint8_t*)&tx_pkt, current_tx_size)) {
+                        pkts_sent++;
+                        is_tx_active = 1;
+                    }
                 }
             }
             break;
@@ -238,7 +253,7 @@ void Test_HandleReceive(void) {
     size_t dec_len = 0;
 
     if (!secure_payload_decrypt(lora_rx->rxBuffer, lora_rx->rxLength, decrypted_buf, &dec_len)) {
-        return; // Silently drop packets failing authentication
+        return;
     }
 
     rx_pkt = (TestPayload_t*)decrypted_buf;
@@ -265,6 +280,7 @@ void Test_HandleReceive(void) {
     last_rx_check = HAL_GetTick();
 
     if (current_role == TEST_ROLE_MASTER) {
+        // Drop out-of-order or duplicate packets
         if (rx_pkt->seq_num >= seq_counter) return;
 
         uint32_t current_tick_us = __HAL_TIM_GET_COUNTER(timer_handle);
@@ -296,6 +312,12 @@ void Test_HandleReceive(void) {
         expected_seq = rx_pkt->seq_num + 1;
         pkts_received++;
 
-        TransmitPacket((uint8_t*)rx_pkt, actual_length);
+        uint8_t expected_mode = SX1272_MODE_STDBY | (uint8_t)lora_tx->modulation;
+        // Prevent Slave from overwriting its own TX FIFO mid-transmission
+        if (SX1272_ReadReg(lora_tx, REG_OP_MODE) == expected_mode) {
+            if (TransmitPacket((uint8_t*)rx_pkt, actual_length)) {
+                pkts_sent++;
+            }
+        }
     }
 }
