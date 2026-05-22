@@ -36,6 +36,8 @@ static uint32_t test_start_time = 0;
 static uint32_t last_tx_time = 0;
 static uint32_t last_rx_check = 0;
 
+static uint8_t is_tx_active = 0;
+
 static uint32_t seq_counter = 0;
 static uint32_t expected_seq = 0;
 
@@ -115,6 +117,7 @@ void Test_SetCustomPayload(uint8_t *data, uint8_t size) {
 void Test_Start(void) {
     current_state = STATE_SYNCING;
     last_tx_time = 0;
+    is_tx_active = 0;
 
     if (current_role == TEST_ROLE_MASTER) {
         char msg[] = "Initiating SYNC with remote device...\r\n";
@@ -138,6 +141,13 @@ static void PrintResults(void) {
 #else
         sprintf(msg, "\r\n--- MASTER TEST RESULTS (PLAINTEXT) ---\r\n");
 #endif
+
+#if TEST_MODE_MAX_THROUGHPUT
+        sprintf(msg + strlen(msg), "Mode: MAX THROUGHPUT\r\n");
+#else
+        sprintf(msg + strlen(msg), "Mode: INTERVAL (%d ms)\r\n", TEST_TX_INTERVAL_MS);
+#endif
+
         sprintf(msg + strlen(msg),
                      "Packets Sent: %lu\r\n"
                      "Packets Rcvd: %lu\r\n"
@@ -192,10 +202,16 @@ void Test_Process(void) {
                 last_tx_time = 0;
                 last_rx_check = current_time;
 
+                is_tx_active = 0;
+
                 ResetCounters();
 
                 if (current_role == TEST_ROLE_MASTER) {
-                    char msg[] = "Sync complete. Starting 60s max-throughput test...\r\n";
+#if TEST_MODE_MAX_THROUGHPUT
+                    char msg[] = "Sync complete. Starting 60s MAX THROUGHPUT test...\r\n";
+#else
+                    char msg[] = "Sync complete. Starting 60s INTERVAL test...\r\n";
+#endif
                     HAL_UART_Transmit(uart_handle, (uint8_t*)msg, strlen(msg), 100);
                 }
             }
@@ -215,6 +231,30 @@ void Test_Process(void) {
             }
 
             if (current_role == TEST_ROLE_MASTER) {
+#if TEST_MODE_MAX_THROUGHPUT
+                if (is_tx_active) {
+                    // Temporarily block RX interrupt to prevent SPI collision
+                    __disable_irq();
+                    uint8_t current_mode = SX1272_ReadReg(lora_tx, REG_OP_MODE);
+                    __enable_irq();
+
+                    uint8_t expected_mode = SX1272_MODE_STDBY | (uint8_t)lora_tx->modulation;
+                    // Detect when DIO0 IRQ drops the module back to STDBY
+                    if (current_mode == expected_mode) {
+                        is_tx_active = 0;
+                    }
+                }
+
+                if (!is_tx_active) {
+                    tx_pkt.seq_num = seq_counter++;
+                    tx_pkt.tx_time_us = __HAL_TIM_GET_COUNTER(timer_handle);
+
+                    if (TransmitPacket((uint8_t*)&tx_pkt, current_tx_size)) {
+                        pkts_sent++;
+                        is_tx_active = 1;
+                    }
+                }
+#else
                 if (current_time - last_tx_time >= TEST_TX_INTERVAL_MS) {
                     tx_pkt.seq_num = seq_counter++;
                     tx_pkt.tx_time_us = __HAL_TIM_GET_COUNTER(timer_handle);
@@ -224,6 +264,7 @@ void Test_Process(void) {
                         last_tx_time = current_time;
                     }
                 }
+#endif
             }
             break;
     }
@@ -297,9 +338,15 @@ void Test_HandleReceive(void) {
         expected_seq = rx_pkt->seq_num + 1;
         pkts_received++;
 
+        // Temporarily block RX interrupt to prevent SPI collision
+        __disable_irq();
+        uint8_t current_mode = SX1272_ReadReg(lora_tx, REG_OP_MODE);
+        __enable_irq();
+
         uint8_t expected_mode = SX1272_MODE_STDBY | (uint8_t)lora_tx->modulation;
-        // Prevent Slave from overwriting its own TX FIFO mid-transmission
-        if (SX1272_ReadReg(lora_tx, REG_OP_MODE) == expected_mode) {
+
+        // Prevent Slave from overwriting its own TX FIFO mid-transmission if it's echoing rapidly
+        if (current_mode == expected_mode) {
             if (TransmitPacket((uint8_t*)rx_pkt, actual_length)) {
                 pkts_sent++;
             }

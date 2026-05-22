@@ -11,7 +11,10 @@
 #define TEST_TX_INTERVAL_MS 50
 #define MAX_CUSTOM_PAYLOAD_SIZE 128
 
-#define TEST_USE_ENCRYPTION 1
+#define TEST_USE_ENCRYPTION 0
+
+// Set to 1 for Max Throughput (continuous blasting), Set to 0 for Interval-based
+#define TEST_MODE_MAX_THROUGHPUT 0
 
 void Test_Init(UART_HandleTypeDef *huart, TIM_HandleTypeDef *htim, SX1272_t *tx_mod, SX1272_t *rx_mod, uint8_t role);
 void Test_SetCustomPayload(uint8_t *data, uint8_t size);
